@@ -1,0 +1,13 @@
+use_frameworks!
+
+target 'GQCommonView_Example' do
+  pod 'GQCommonView', :path => '../'
+  pod 'Masonry'
+  
+  
+  target 'GQCommonView_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end
