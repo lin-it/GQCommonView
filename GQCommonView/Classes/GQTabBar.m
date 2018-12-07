@@ -31,7 +31,7 @@
         
         [self.imgView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(self.contentView).offset(2.f);
-            make.size.mas_equalTo(CGSizeMake(24, 24));
+            make.size.mas_equalTo(CGSizeMake(30, 30));
             make.centerX.equalTo(self.contentView);
         }];
         
@@ -39,8 +39,6 @@
             make.top.equalTo(self.imgView.mas_bottom).offset(2.f);
             make.centerX.equalTo(self.contentView);
         }];
-        
-        
         
         [line mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.top.equalTo(self);
@@ -55,7 +53,6 @@
 - (UIImageView *)imgView {
     if(!_imgView){
         _imgView = [UIImageView new];
-        _imgView.backgroundColor = [UIColor blackColor];
     }
     return _imgView;
 }
@@ -63,6 +60,7 @@
 - (UILabel *)label {
     if(!_label){
         _label = [UILabel new];
+        _label.font = [UIFont systemFontOfSize:10.f];
     }
     return _label;
 }
@@ -119,7 +117,7 @@
     GQTabBarItemView *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"GQTabBarItemView" forIndexPath:indexPath];
     
     NSDictionary *viewModel = self.list[indexPath.row];
-    cell.imgView.image = indexPath.row == self.selectIdx ? [UIImage imageNamed:viewModel[@"img"]] :  [UIImage imageNamed:viewModel[@"img_select"]];
+    cell.imgView.image = indexPath.row == self.selectIdx ? [UIImage imageNamed:viewModel[@"img_select"]] :  [UIImage imageNamed:viewModel[@"img"]];
     cell.label.text = viewModel[@"title"];
     
     cell.label.textColor = indexPath.row == self.selectIdx ? [UIColor gq_colorWithStringHex:viewModel[@"title_color"]] : [UIColor gq_colorWithStringHex:viewModel[@"title_color_select"]];
