@@ -13,14 +13,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy) UIView *(^viewAtIdxBlock)(NSInteger idx);
 @property (nonatomic, copy) CGRect(^toFrameAtIdxBlock)(NSInteger idx);
+@property (nonatomic, copy) UIView *(^toViewAtIdxBlock)(NSInteger idx);
 
+@property (nonatomic, assign) NSUInteger currentIndex;
 
-@property (nonatomic, readonly) NSUInteger currentIndex;
+- (void)beforeShowView;
+- (void)showView;
 
 @end
 
 
 @interface GQPercentDrivenInteractiveTransition : UIPercentDrivenInteractiveTransition
+
 
 @end
 
@@ -39,6 +43,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) GQPhotoBrowserDismissalAnimation *dismissalAnimation;
 
 - (void)bindToViewController:(UIViewController<GQPhotoBrowserManagerDelegate> *)viewController;
+
++ (instancetype)sharedInstance;
 
 @end
 

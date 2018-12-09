@@ -19,14 +19,21 @@
 
 @implementation GQToast
 
-+ (void)showToastWithText:(NSString *)text {
+
++ (instancetype)sharedInstance {
     static GQToast *toast;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         toast = [GQToast new];
     });
+    return toast;
+}
+
++ (instancetype)showToastWithText:(NSString *)text {
+    GQToast *toast = [GQToast sharedInstance];
     toast.toastLabel.text = text;
     [toast showToast];
+    return toast;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame

@@ -209,7 +209,7 @@ static CGFloat GQInfinitelyRefreshFooterStartRefreshOffset = 0.f;
 - (UILabel *)idleLabel {
     if (!_idleLabel) {
         _idleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, self.mj_h)];
-        _idleLabel.text = self.idleText ?: @"上拉加载更多";
+        _idleLabel.text = self.idleText ?: @"";
         _idleLabel.font = [UIFont systemFontOfSize:12];
         _idleLabel.textColor = [UIColor gq_colorWithHex:0xb2b2b2];
         _idleLabel.textAlignment = NSTextAlignmentCenter;

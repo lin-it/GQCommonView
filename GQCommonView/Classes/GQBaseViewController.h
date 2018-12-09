@@ -12,4 +12,8 @@
 
 @property (nonatomic, strong) GQNavigationBar *navBar;
 
+@property (nonatomic, weak) UIView *tabBarView;
+
+- (void)rightButtonClick;
+
 @end

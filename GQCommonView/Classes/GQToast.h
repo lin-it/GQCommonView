@@ -15,8 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIView *toastBgView;
 
 
-+ (void)showToastWithText:(NSString *)text;
++ (instancetype)showToastWithText:(NSString *)text;
 
++ (instancetype)sharedInstance;
 @end
 
 NS_ASSUME_NONNULL_END

@@ -86,21 +86,21 @@
 
 
 - (UIButton *)leftButton {
-    if(_leftButton) {
+    if(!_leftButton) {
         _leftButton = [UIButton new];
     }
     return _leftButton;
 }
 
 - (UIButton *)rightButton {
-    if(_rightButton) {
+    if(!_rightButton) {
         _rightButton = [UIButton new];
     }
     return _rightButton;
 }
 
 - (UILabel *)navBarTitleLabel {
-    if(_navBarTitleLabel) {
+    if(!_navBarTitleLabel) {
         _navBarTitleLabel = [UILabel new];
     }
     return _navBarTitleLabel;

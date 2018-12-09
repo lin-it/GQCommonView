@@ -7,17 +7,24 @@
 #import <GQTool/GQLazyProperty.h>
 #import "GQPhotoBrowserManager.h"
 #import <libextobjc/EXTScope.h>
+#import <BlocksKit/BlocksKit.h>
+
+static const void *BBProductPhotoBrowserAnimatingImageViewKey = &BBProductPhotoBrowserAnimatingImageViewKey;
 
 UIImage *GQPhotoBrowerImageFromView(UIView *v);
 
 UIImage *GQPhotoBrowerImageFromView(UIView *v) {
     if ([v isKindOfClass:[UIImageView class]]) {
         UIImageView *img = (UIImageView *)v;
-        return img.image;
+        if (img.image) {
+            return img.image;
+        }
     }
     UIGraphicsBeginImageContextWithOptions(v.bounds.size, YES, 0);
     if (!v.layer.backgroundColor || CGColorEqualToColor(v.layer.backgroundColor, [UIColor clearColor].CGColor)) {
-        v.layer.backgroundColor = [UIColor whiteColor].CGColor;
+        if (![v isKindOfClass:[UIImageView class]]) {
+            v.layer.backgroundColor = [UIColor whiteColor].CGColor;
+        }
     }
     [v.layer renderInContext:UIGraphicsGetCurrentContext()];
     UIImage *viewImage = UIGraphicsGetImageFromCurrentImageContext();
@@ -47,8 +54,82 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
 
 @end
 
+@interface GQPercentDrivenInteractiveTransition()
+
+@property (nonatomic, weak) UIViewController *presentingVC;
+
+@property (nonatomic, assign) BOOL interacting;
+
+@property (nonatomic, assign) BOOL shouldComplete;
+
+- (void)bindToViewController:(UIViewController*)viewController;
+
+@end
 
 @implementation GQPercentDrivenInteractiveTransition
+
+-(CGFloat)completionSpeed {
+    return 1 - self.percentComplete;
+}
+
+- (void)bindToViewController:(UIViewController*)viewController {
+    self.presentingVC = viewController;
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(pan:)];
+    [viewController.view addGestureRecognizer:pan];
+}
+
+- (void)pan:(UIGestureRecognizer *)sender {
+    CGPoint translation = [(UIPanGestureRecognizer *)sender translationInView:sender.view.superview];
+    CGFloat fraction = 2.f * fabs(translation.y / [UIScreen mainScreen].bounds.size.height);
+    fraction = fminf(fmaxf(fraction, 0.f), 1.f);
+    CGFloat finalFraction = fraction;
+    if (fraction > 0.3f) {
+        finalFraction = 1.f - 0.21f / fraction;
+    }
+    
+    __GQPhotoAnimatingImageView *animatingImageView = [self.presentingVC bk_associatedValueForKey:BBProductPhotoBrowserAnimatingImageViewKey];
+    
+    switch (sender.state) {
+        case UIGestureRecognizerStateBegan:
+            break;
+        case UIGestureRecognizerStateChanged: {
+            CGFloat absX = fabs(translation.x);
+            CGFloat absY = fabs(translation.y);
+            if (absY / absX > 1.f && !self.interacting) {
+                self.interacting = YES;
+                [self.presentingVC dismissViewControllerAnimated:YES completion:nil];
+            }
+            if (!self.interacting) {
+                break;
+            }
+            self.shouldComplete = (fraction > 0.3f);
+            [self updateInteractiveTransition:fraction];
+            animatingImageView.transform = CGAffineTransformMakeTranslation(0.f, translation.y);
+            break;
+        }
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled: {
+            if (!self.interacting) {
+                return;
+            }
+            
+            CGFloat duration = 0.5f * (1.f - finalFraction);
+            self.interacting = NO;
+            if (!self.shouldComplete || sender.state == UIGestureRecognizerStateCancelled) {
+                [self cancelInteractiveTransition];
+            } else {
+                [self finishInteractiveTransition];
+                [animatingImageView showMaskLayerWithTime:duration];
+            }
+            [UIView animateWithDuration:duration animations:^{
+                animatingImageView.transform = CGAffineTransformIdentity;
+            }];
+            break;
+        }
+        default:
+            break;
+    }
+}
 
 @end
 
@@ -63,10 +144,11 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
     UIViewController<GQPhotoBrowserManagerDelegate> *toVC = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
 
     UIView *containerView = [transitionContext containerView];
-//    [containerView addSubview:toVC.view];
+    [containerView addSubview:toVC.view];
+    toVC.view.alpha = 0;
 
     UIView *sourceView = nil;
-    if ([toVC respondsToSelector:@selector(viewAtIdxBlock)] && [toVC respondsToSelector:@selector(currentIndex)]) {
+    if ([toVC respondsToSelector:@selector(viewAtIdxBlock)] && [toVC respondsToSelector:@selector(currentIndex)]  && toVC.viewAtIdxBlock) {
         sourceView = toVC.viewAtIdxBlock(toVC.currentIndex);
     }
 
@@ -74,7 +156,7 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
                                                               toView:[[UIApplication sharedApplication].delegate window]];
 
     CGRect finallyFrame = [UIScreen mainScreen].bounds;
-    if ([toVC respondsToSelector:@selector(toFrameAtIdxBlock)] && [toVC respondsToSelector:@selector(currentIndex)]) {
+    if ([toVC respondsToSelector:@selector(toFrameAtIdxBlock)] && [toVC respondsToSelector:@selector(currentIndex)] && toVC.toFrameAtIdxBlock) {
         finallyFrame = toVC.toFrameAtIdxBlock(toVC.currentIndex);
     }
      __GQPhotoAnimatingImageView *animatingImageView = [[__GQPhotoAnimatingImageView alloc] initWithFrame:initialImageViewFrame];
@@ -82,6 +164,7 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
     CGRect starFrame = initialImageViewFrame;
 
     UIImage *image = GQPhotoBrowerImageFromView(sourceView);
+    animatingImageView.image = image;
     CGSize imageSize = image.size;
     CGFloat w = 0;
     CGFloat h = 0;
@@ -108,15 +191,22 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
     animatingImageView.starFrame = starFrame;
     animatingImageView.endFrame = finallyFrame;
     animatingImageView.endMaskFrame = CGRectMake(0, 0, finallyFrame.size.width, finallyFrame.size.height);
+    
+    if ([toVC respondsToSelector:@selector(beforeShowView)]) {
+        [toVC beforeShowView];
+    }
     @weakify(toVC,animatingImageView,transitionContext,sourceView)
     animatingImageView.animationBlock = ^{
         @strongify(toVC)
-//        toVC.view.alpha = 1.f;
+        toVC.view.alpha = 1.f;
     };
     animatingImageView.complete = ^{
         @strongify(toVC,animatingImageView,transitionContext,sourceView)
         [transitionContext completeTransition:YES];
         sourceView.hidden = NO;
+        if ([toVC respondsToSelector:@selector(showView)]) {
+            [toVC showView];
+        }
 //        [toVC setBigImgViewHide:NO];
 //        [toVC reloadReplaceView];
         [animatingImageView removeFromSuperview];
@@ -132,6 +222,65 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
 }
 
 - (void)animateTransition:(id <UIViewControllerContextTransitioning>)transitionContext {
+    UIViewController<GQPhotoBrowserManagerDelegate> *fromVC = [transitionContext viewControllerForKey:UITransitionContextFromViewControllerKey];
+    
+    UIViewController<GQPhotoBrowserManagerDelegate> *toVC = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+    
+    UIView *containerView = [transitionContext containerView];
+    [containerView addSubview:toVC.view];
+    
+    UIView *toView = nil;
+    if ([fromVC respondsToSelector:@selector(viewAtIdxBlock)] && [fromVC respondsToSelector:@selector(currentIndex)] && fromVC.viewAtIdxBlock) {
+        toView = fromVC.viewAtIdxBlock(fromVC.currentIndex);
+    }
+    
+    UIView *fromView = nil;
+    if ([fromVC respondsToSelector:@selector(toViewAtIdxBlock)] && [fromVC respondsToSelector:@selector(currentIndex)] && fromVC.toViewAtIdxBlock) {
+        fromView = fromVC.toViewAtIdxBlock(fromVC.currentIndex);
+    }
+    
+    CGRect fromImageViewFrame = [fromView.superview convertRect:fromView.frame
+                                                         toView:[[UIApplication sharedApplication].delegate window]];
+    
+    
+    CGRect toImageViewFrame = [toView.superview convertRect:toView.frame
+                                                         toView:[[UIApplication sharedApplication].delegate window]];
+    
+    __GQPhotoAnimatingImageView *animatingImageView = [[__GQPhotoAnimatingImageView alloc] initWithFrame:fromImageViewFrame];
+    
+    animatingImageView.image = GQPhotoBrowerImageFromView(fromView);
+    
+    [containerView addSubview:animatingImageView];
+    [containerView sendSubviewToBack:toVC.view];
+    
+    //to do 填充模式都是fill 所以计算没必要，以后完善
+    NSTimeInterval duration = [self transitionDuration:transitionContext];
+    animatingImageView.duration = duration;
+    animatingImageView.starFrame = fromImageViewFrame;
+    animatingImageView.endFrame = toImageViewFrame;
+    animatingImageView.starMaskFrame = CGRectMake(0, 0, CGRectGetWidth(fromImageViewFrame), CGRectGetHeight(fromImageViewFrame));
+    animatingImageView.endMaskFrame = CGRectMake(0, 0, CGRectGetWidth(animatingImageView.endFrame), CGRectGetHeight(animatingImageView.endFrame));
+    
+    @weakify(animatingImageView,fromVC,transitionContext,fromImageViewFrame,toVC)
+    animatingImageView.animationBlock = ^{
+        @strongify(fromVC)
+        fromVC.view.alpha = 0;
+    };
+    animatingImageView.complete = ^{
+        @strongify(animatingImageView,fromVC,transitionContext,fromImageViewFrame,toVC)
+        [transitionContext completeTransition:![transitionContext transitionWasCancelled]];
+//        destinationImageView.hidden = NO;
+//        [fromVC setBigImgViewHide:NO];
+        [animatingImageView removeFromSuperview];
+        // 如果取消了切换，则删除要返回的vc.view
+        if (transitionContext.transitionWasCancelled) {
+            [toVC.view removeFromSuperview];
+            [fromVC bk_associateValue:nil withKey:BBProductPhotoBrowserAnimatingImageViewKey];
+//            [fromVC reloadReplaceView];
+        }
+    };
+    BOOL isInteracting = [GQPhotoBrowserManager sharedInstance].interactiveTransition.interacting;
+    [animatingImageView showAnimationWithMaskLayer:isInteracting];
 
 }
 @end
@@ -140,24 +289,26 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
 
 @property (nonatomic, weak) UIViewController *bindViewController;
 
+
 @end
 
 @implementation GQPhotoBrowserManager
 
-- (instancetype)init
++ (instancetype)sharedInstance
 {
-    self = [super init];
-    if (self) {
-
-    }
-    return self;
+    static GQPhotoBrowserManager *sharedSingleton = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^(void) {
+        sharedSingleton = [[self alloc] init];
+    });
+    return sharedSingleton;
 }
 
 - (void)bindToViewController:(UIViewController*)viewController {
     self.bindViewController = viewController;
     viewController.transitioningDelegate = self;
-//    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(pan:)];
-//    [viewController.view addGestureRecognizer:pan];
+    
+    [self.interactiveTransition bindToViewController:viewController];
 }
 
 #pragma mark - UIViewControllerTransitioningDelegate
@@ -171,7 +322,7 @@ UIImage *GQPhotoBrowerImageFromView(UIView *v) {
 }
 
 - (id<UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id<UIViewControllerAnimatedTransitioning>)animator {
-    return nil;
+    return self.interactiveTransition;
 }
 
 
@@ -195,11 +346,11 @@ GQLazyPropertyWithInit(GQPhotoBrowserDismissalAnimation, dismissalAnimation, {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        self.contentMode = UIViewContentModeScaleAspectFit;
-        self.maskLayer = [CAShapeLayer layer];
-        self.maskLayer.backgroundColor = [UIColor whiteColor].CGColor;
-        self.layer.mask = self.maskLayer;
-        self.maskLayer.path = [UIBezierPath bezierPathWithRect:self.bounds].CGPath;
+        self.contentMode = UIViewContentModeScaleAspectFill;
+//        self.maskLayer = [CAShapeLayer layer];
+//        self.maskLayer.backgroundColor = [UIColor whiteColor].CGColor;
+//        self.layer.mask = self.maskLayer;
+//        self.maskLayer.path = [UIBezierPath bezierPathWithRect:self.bounds].CGPath;
     }
     return self;
 }

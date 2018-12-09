@@ -6,6 +6,8 @@
 //
 
 #import "GQBaseViewController.h"
+#import <BlocksKit/UIView+BlocksKit.h>
+#import <libextobjc/EXTScope.h>
 
 @interface GQBaseViewController ()
 
@@ -16,16 +18,30 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationController.navigationBarHidden = YES;
+    self.navigationController.navigationBar.hidden = YES;
     [self.view addSubview:self.navBar];
+    
+    @weakify(self)
+    [self.navBar.rightButton bk_whenTapped:^{
+        @strongify(self)
+        [self rightButtonClick];
+    }];
     
     
     // Do any additional setup after loading the view.
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    self.navigationController.navigationBarHidden = YES;
+    self.navigationController.navigationBar.hidden = YES;
 }
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
 }
+
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
@@ -34,6 +50,12 @@
     } else {
         self.navBar.frame = CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 44 + [UIApplication sharedApplication].statusBarFrame.size.height);
     }
+}
+
+#pragma mark - public
+
+- (void)rightButtonClick {
+    
 }
 
 #pragma mark - get & set
